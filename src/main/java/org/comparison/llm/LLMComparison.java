@@ -8,6 +8,7 @@ import okhttp3.*;
 import java.io.FileWriter;
 import java.io.IOException;
 
+
 public class LLMComparison {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final OkHttpClient client = new OkHttpClient();
@@ -15,14 +16,14 @@ public class LLMComparison {
     public static void main(String[] args) {
         Dotenv dotenv = Dotenv.load();
         String geminiApiKey = dotenv.get("GEMINI_API_KEY");
-        String openAiApiKey = dotenv.get("OPENAI_API_KEY");
+        String groqApiKey = dotenv.get("GROQ_API_KEY"); // Changed from OpenAI
 
         String prompt = "Explain quantum computing to a 10-year-old";
 
         String geminiResponse = callGeminiAPI(geminiApiKey, prompt);
-        String openAiResponse = callOpenAIAPI(openAiApiKey, prompt);
+        String groqResponse = callGroqAPI(groqApiKey, prompt); // Changed from OpenAI
 
-        saveComparisonReport(geminiResponse, openAiResponse);
+        saveComparisonReport(geminiResponse, groqResponse);
     }
 
     private static String callGeminiAPI(String apiKey, String prompt) {
@@ -39,7 +40,6 @@ public class LLMComparison {
 
             JsonNode root = mapper.readTree(body);
 
-            // SAFETY CHECK: Make sure candidates and parts exist
             if (root.has("candidates") && root.get("candidates").isArray() && root.get("candidates").size() > 0) {
                 JsonNode firstCandidate = root.get("candidates").get(0);
                 if (firstCandidate.has("content") &&
@@ -58,12 +58,13 @@ public class LLMComparison {
         }
     }
 
-    private static String callOpenAIAPI(String apiKey, String prompt) {
+    private static String callGroqAPI(String apiKey, String prompt) {
         try {
-            String jsonRequest = "{ \"model\": \"gpt-4o-mini\", \"messages\": [{\"role\": \"user\", \"content\": \"" + prompt + "\"}] }";
+            String jsonRequest = "{ \"model\": \"llama-3.3-70b-versatile\", \"messages\": [{\"role\": \"user\", \"content\": \"" + prompt + "\"}] }";
+
 
             Request request = new Request.Builder()
-                    .url("https://api.openai.com/v1/chat/completions")
+                    .url("https://api.groq.com/openai/v1/chat/completions")
                     .header("Authorization", "Bearer " + apiKey)
                     .post(RequestBody.create(jsonRequest, MediaType.parse("application/json")))
                     .build();
@@ -73,7 +74,6 @@ public class LLMComparison {
 
             JsonNode root = mapper.readTree(body);
 
-            // SAFETY CHECK: Make sure choices and messages exist
             if (root.has("choices") && root.get("choices").isArray() && root.get("choices").size() > 0) {
                 JsonNode messageNode = root.get("choices").get(0).path("message");
                 if (messageNode.has("content")) {
@@ -81,24 +81,24 @@ public class LLMComparison {
                 }
             }
 
-            System.err.println("[OpenAI Warning] Unexpected response: " + body);
-            return "OpenAI returned an unexpected response format.";
+            System.err.println("[Groq Warning] Unexpected response: " + body);
+            return "Groq returned an unexpected response format.";
 
         } catch (IOException e) {
             e.printStackTrace();
-            return "Error calling OpenAI API.";
+            return "Error calling Groq API.";
         }
     }
 
-    private static void saveComparisonReport(String geminiOutput, String openAiOutput) {
+    private static void saveComparisonReport(String geminiOutput, String groqOutput) {
         try (FileWriter writer = new FileWriter("llm_comparison_report.md")) {
             writer.write("# LLM Comparison Report\n\n");
             writer.write("## Prompt\n");
             writer.write("Explain quantum computing to a 10-year-old\n");
             writer.write("## Gemini Response\n");
             writer.write(geminiOutput + "\n\n");
-            writer.write("## OpenAI Response\n");
-            writer.write(openAiOutput + "\n");
+            writer.write("## Groq Response\n");
+            writer.write(groqOutput + "\n");
             System.out.println("✅ Comparison report saved to llm_comparison_report.md");
         } catch (IOException e) {
             e.printStackTrace();
